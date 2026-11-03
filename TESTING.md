@@ -13,7 +13,7 @@
 | core | `ConfigParserTest` | Valid config, shipped placeholders count as missing, token/project ID format, all errors reported at once, `custom-fields`/`messages` of the wrong type, token never echoed |
 | core | `IssueAssemblerTest`, `DiagnosticsTest` | Release label default, custom field mapping, admin-facing explanations |
 | core | `BetaHubClientTest` (HTTP stub, `com.sun.net.httpserver`) | Path, method, `Authorization`, `BetaHub-Project-ID`, JSON body with newlines, quotes, Polish letters and emoji; optional fields omitted; 201 (incl. `scoped_id: null`, warnings); 403 daily limit; 403 plan limit; 429; 403 release permission → retry without label; 422; 401; 403 wrong project; 503 → one retry; 503 twice → failure; 500 and 502 not retried; timeout not retried; "may have been created" set for timeout, 5xx other than 503 and unreadable success, not for connection refused; unsafe issue URL refused; `/auth/verify` |
-| core | `LiveBetaHubTest` | Real BetaHub: token check and one real issue. **Runs only** when `BETAHUB_TEST_PROJECT` and `BETAHUB_TEST_TOKEN` are set (optional `BETAHUB_TEST_BASE_URL`). |
+| core | `LiveBetaHubTest` | Real BetaHub: token check, a full plugin report (context block, steps, release label, custom fields, redacted log) and a plain issue with Unicode. **Runs only** when `BETAHUB_TEST_PROJECT` and `BETAHUB_TEST_TOKEN` are set (optional `BETAHUB_TEST_BASE_URL`); creates two real issues. |
 | paper | `ReportFlowTest` (MockBukkit) | `/bug` → dialog with configured limits; context taken at `/bug`, not at submit; validation reopens the dialog with an error and keeps the text; async send; link in chat; cooldown, bypass permission, cooldown lifted after a failure where nothing was sent but kept after rate limit or an unconfirmed (possibly saved) report; unexpected error still answers the player; 422 message; log excerpt redacted; missing log file; custom fields; player leaving before the answer; misconfigured plugin |
 | paper | `PluginTest` (MockBukkit) | Plugin loads with shipped config and lists what is missing; `/report` alias off by default; console cannot use `/bug`; non-admins do not see `/bugreport`; `/bugreport reload`; `/bugreport test` against the HTTP stub (verify → test issue), and stops before creating an issue when the token belongs to another project |
 | paper | `ReportDialogTest` | Dialog response → draft with a fake `DialogResponseView` (MockBukkit cannot build dialogs); response from a non-main thread is moved to the main thread; non-player audience ignored |
@@ -31,14 +31,33 @@ multiline, Submit bound to a Paper click callback, Cancel without action.
 
 Results on 2026-11-03 (macOS, arm64):
 
-| Server | Java | Result |
-|---|---|---|
-| Paper 1.21.11-132 | 21.0.9 | pass, including `--with-bot` |
-| Paper 26.3-238 | 25.0.4.1 (Temurin, downloaded by Gradle) | pass (bot not run: Mineflayer supports up to 26.1) |
+| Server | Java | Fake BetaHub | Local BetaHub backend |
+|---|---|---|---|
+| Paper 1.21.11-132 | 21.0.9 | pass, including `--with-bot` | pass, including `--with-bot` (issue #4 created) |
+| Paper 26.3-238 | 25.0.4.1 (Temurin, downloaded by Gradle) | pass | pass (bot not run: Mineflayer supports up to 26.1) |
+
+On the local backend, BetaHub hid the second, near-identical test report as a duplicate. It got no issue number,
+so the plugin reported it as `g-<id>` (`Bug report g-8 created: .../issues/g-8`), as designed.
 
 Checked on both: plugin enables; token verified at startup; `Dialog API OK on Paper <version>`; test issue
 created; no errors, warnings or deprecation notes from the plugin in the server log; requests use
 `Bearer` for `/auth/verify` and `FormUser` plus `BetaHub-Project-ID` and JSON for the issue.
+
+### Against the real BetaHub backend
+
+On 2026-11-03 against a local development instance of the BetaHub backend (`http://localhost:3148`,
+backend branch with no changes to issue submission), with a project auth token that may create bug
+reports but not releases:
+
+- `LiveBetaHubTest`: 3 of 3 passed. Creating an issue took 8 to 13 seconds, because BetaHub writes the
+  title with AI during the request.
+- Stored result of the full plugin report, read back from the database: AI title "Chest in the Nether
+  Disappears Upon Relogging"; release `1.21.11` created; steps split into 3; custom fields `mc_server` and
+  `mc_location` created and filled; log attached with the IP replaced by `[IP]`; teleport command in the
+  description.
+- `smoke-test.sh` with `BETAHUB_TEST_*` pointing at that backend: see the smoke test table above.
+
+Production (`app.betahub.io`) was not used.
 
 ### Not covered automatically
 
@@ -46,8 +65,8 @@ created; no errors, warnings or deprecation notes from the plugin in the server 
   Paper 1.21.11 decodes the bot's `custom_click_action` packet as `client_command` and disconnects it
   (library issue). The submit path is covered by `ReportFlowTest` and `ReportDialogTest`, and the HTTP part
   by `/bugreport test` on real servers.
-- **The real BetaHub API.** `LiveBetaHubTest` was skipped: no test project or token was provided. All
-  HTTP behavior was verified against a stub built from the BetaHub backend source, not against the live service.
+- **Production BetaHub** (`app.betahub.io`): only a local instance of the same backend was used. Error paths
+  (daily limit, release permission on a public project, 5xx) were tested against the stub only.
 - **Look and feel of the dialog** in a real client: see below.
 
 ## Manual test with a Minecraft client

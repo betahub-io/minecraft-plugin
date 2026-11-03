@@ -5,6 +5,10 @@
 # Usage: scripts/smoke-test.sh 1.21.11|26.3 [--with-bot]
 #   --with-bot  also let a Mineflayer bot join, run /bug and check the dialog it receives
 #               (1.21.11 only; run `npm install` in e2e/ first)
+#
+# With BETAHUB_TEST_PROJECT and BETAHUB_TEST_TOKEN set (and optionally BETAHUB_TEST_BASE_URL, default
+# https://app.betahub.io), the server talks to that real BetaHub instead of the fake one and creates one
+# real test issue.
 set -euo pipefail
 
 VERSION="${1:?usage: smoke-test.sh 1.21.11|26.3 [--with-bot]}"
@@ -22,7 +26,15 @@ esac
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RUN_DIR="$ROOT/run/$VERSION"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/betahub-smoke.XXXXXX")"
+USE_STUB=1
 PROJECT="pr-1234567890"
+TOKEN="tkn-smoketest123"
+if [[ -n "${BETAHUB_TEST_TOKEN:-}" ]]; then
+  USE_STUB=0
+  PROJECT="${BETAHUB_TEST_PROJECT:?BETAHUB_TEST_PROJECT is required with BETAHUB_TEST_TOKEN}"
+  TOKEN="$BETAHUB_TEST_TOKEN"
+  BASE_URL="${BETAHUB_TEST_BASE_URL:-https://app.betahub.io}"
+fi
 START_TIMEOUT=900   # first run downloads Paper (and maybe a JDK)
 COMMAND_TIMEOUT=60
 
@@ -46,11 +58,15 @@ wait_for() { # file pattern timeout
   done
 }
 
-progress "Starting fake BetaHub"
-python3 -I "$ROOT/scripts/stub_betahub.py" --project "$PROJECT" --port-file "$WORK/stub-port" --log "$WORK/requests.jsonl" &
-STUB_PID=$!
-for _ in $(seq 1 50); do [[ -s "$WORK/stub-port" ]] && break; sleep 0.1; done
-STUB_PORT="$(cat "$WORK/stub-port")"
+if (( USE_STUB )); then
+  progress "Starting fake BetaHub"
+  python3 -I "$ROOT/scripts/stub_betahub.py" --project "$PROJECT" --port-file "$WORK/stub-port" --log "$WORK/requests.jsonl" &
+  STUB_PID=$!
+  for _ in $(seq 1 50); do [[ -s "$WORK/stub-port" ]] && break; sleep 0.1; done
+  BASE_URL="http://127.0.0.1:$(cat "$WORK/stub-port")"
+else
+  progress "Using real BetaHub at $BASE_URL"
+fi
 MC_PORT="$(python3 -I -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')"
 
 progress "Preparing $RUN_DIR"
@@ -58,9 +74,9 @@ mkdir -p "$RUN_DIR/plugins/BetaHubBugReporter"
 rm -f "$RUN_DIR/logs/latest.log"
 cat > "$RUN_DIR/plugins/BetaHubBugReporter/config.yml" <<YAML
 betahub:
-  base-url: "http://127.0.0.1:$STUB_PORT"
+  base-url: "$BASE_URL"
   project-id: "$PROJECT"
-  token: "tkn-smoketest123"
+  token: "$TOKEN"
 server-name: "smoke-$VERSION"
 YAML
 cat > "$RUN_DIR/server.properties" <<PROPS
@@ -88,7 +104,7 @@ fi
 progress "Running commands"
 echo "bug" >&3
 echo "bugreport test" >&3
-wait_for "$LOG" 'Bug report #[0-9]+ created|BetaHub rejected|Could not send' "$COMMAND_TIMEOUT"
+wait_for "$LOG" 'Bug report (#[0-9]+|g-[0-9]+) created|BetaHub rejected|Could not send' "$COMMAND_TIMEOUT"
 sleep 1
 echo "stop" >&3
 wait "$SERVER_PID" || true
@@ -103,10 +119,10 @@ check_absent() { # description pattern
   if grep -E "$2" "$LOG" | grep -q .; then echo "FAIL  $1:"; grep -E "$2" "$LOG" | head -20; FAIL=1; else echo "pass  $1"; fi
 }
 check "plugin enabled"                       '\[BetaHubBugReporter\] Enabling BetaHubBugReporter'
-check "token verified at startup"            "BetaHub token 'Smoke test' is valid for project $PROJECT"
+check "token verified at startup"            "BetaHub token '.*' is valid for project $PROJECT"
 check "console /bug refused"                 'Only players can report bugs\.'
 check "dialog API works on this server"      "Dialog API OK on Paper $VERSION\."
-check "test issue created"                   "Bug report #1 created: https://app.betahub.io/projects/$PROJECT/issues/1"
+check "test issue created"                   "Bug report (#[0-9]+|g-[0-9]+) created: https?://[^ ]+/projects/$PROJECT/issues/"
 check_absent "no errors from the plugin"           '(ERROR|SEVERE)\]: .*[Bb]eta[Hh]ub|at io\.betahub\.'
 check_absent "no warnings from the plugin"         'WARN\]: \[BetaHubBugReporter\]'
 check_absent "no deprecation notes about the plugin" '[Dd]eprecat.*[Bb]eta[Hh]ub'
@@ -115,6 +131,7 @@ if (( WITH_BOT )); then
   if (( BOT_FAIL )); then echo "FAIL  bot flow"; FAIL=1; else echo "pass  bot flow"; fi
 fi
 
+if (( USE_STUB )); then
 python3 -I - "$WORK/requests.jsonl" "$PROJECT" <<'PY' || FAIL=1
 import json, sys
 requests = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]
@@ -136,9 +153,10 @@ if issues:
     expect(issue["user_agent"].startswith("BetaHubBugReporter/"), "user agent")
 sys.exit(0 if ok else 1)
 PY
+fi
 
 echo
 echo "Server log: $LOG"
-echo "Requests:   $WORK/requests.jsonl"
+if (( USE_STUB )); then echo "Requests:   $WORK/requests.jsonl"; fi
 if (( FAIL )); then echo "SMOKE TEST FAILED ($VERSION)"; exit 1; fi
 echo "SMOKE TEST PASSED ($VERSION)"

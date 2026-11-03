@@ -45,6 +45,9 @@ The project ID is in the project URL: `https://app.betahub.io/projects/pr-XXXXXX
 On startup and on every reload, the plugin checks the token with BetaHub (this does not use up any reports)
 and warns in the console if the daily limit is still at the default or the token belongs to another project.
 
+BetaHub hides a report it recognizes as a duplicate. The player still gets a link, which points to the hidden
+issue (`.../issues/g-<id>`).
+
 If BetaHub does not confirm a report in time, it was probably saved anyway: the player is told not to resend
 yet (`messages.uncertain`) and keeps the cooldown, so they do not file a duplicate.
 
@@ -173,3 +176,7 @@ Not decided yet, so not built:
    have. Reports carry the player name and UUID in the description (and optionally a custom field).
    A dedicated field or reporter mapping is open.
 3. **Distribution.** Modrinth and Hangar under the BetaHub name, or private delivery to the first customer.
+
+## License
+
+[MIT](LICENSE)
