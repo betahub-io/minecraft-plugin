@@ -1,0 +1,19 @@
+name: BetaHubBugReporter
+version: '${version}'
+main: io.betahub.minecraft.paper.BetaHubBugReporterPlugin
+api-version: '1.21.11'
+description: Lets players report bugs to BetaHub from inside the game.
+website: https://betahub.io
+authors: [BetaHub]
+softdepend: [ViaVersion]
+
+permissions:
+  betahub.report:
+    description: Use /bug to report a bug.
+    default: true
+  betahub.admin:
+    description: Use /bugreport reload and /bugreport test.
+    default: op
+  betahub.bypasscooldown:
+    description: Report bugs without waiting for the cooldown.
+    default: op

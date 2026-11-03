@@ -1,0 +1,12 @@
+{
+  "name": "betahub-bug-reporter-e2e",
+  "private": true,
+  "description": "Bot client that joins a local Paper 1.21.11 server, runs /bug and answers the dialog.",
+  "type": "module",
+  "scripts": {
+    "bot": "node bot.mjs"
+  },
+  "dependencies": {
+    "mineflayer": "4.39.0"
+  }
+}

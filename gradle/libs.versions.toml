@@ -1,0 +1,20 @@
+[versions]
+paper-api = "1.21.11-R0.1-SNAPSHOT"
+viaversion-api = "5.12.2"
+gson = "2.11.0"
+junit = "6.0.3"
+mockbukkit = "4.116.3"
+run-paper = "3.1.0"
+
+[libraries]
+paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
+viaversion-api = { module = "com.viaversion:viaversion-api", version.ref = "viaversion-api" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+mockbukkit = { module = "org.mockbukkit.mockbukkit:mockbukkit-v1.21", version.ref = "mockbukkit" }
+
+[plugins]
+run-paper = { id = "xyz.jpenilla.run-paper", version.ref = "run-paper" }

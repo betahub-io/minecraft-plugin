@@ -1,0 +1,77 @@
+# BetaHub Bug Reporter
+# Docs: https://betahub.io/docs/  ·  After editing, run /bugreport reload, then /bugreport test.
+
+betahub:
+  base-url: "https://app.betahub.io"
+  # Your project ID, from the project URL: https://app.betahub.io/projects/pr-XXXXXXXXXX
+  project-id: "pr-XXXXXXXXXX"
+  # Project auth token (starts with tkn-). Create it in BetaHub: project Settings > Integrations > Auth Tokens,
+  # with "Can Create Bug Report" enabled.
+  # IMPORTANT: BetaHub limits bug reports per IP address per day (default 8). All players on this server
+  # share the server's IP, so raise "Limit Per Day" on the token or the whole server gets 8 reports a day.
+  token: "tkn-XXXX"
+  # Release the reports are filed under. Empty = the Minecraft server version (e.g. 1.21.11).
+  # On a public project, a release that does not exist yet needs "Can Create Release" on the token;
+  # without it, reports go to the latest release and the console shows a warning.
+  release-label: ""
+  # Seconds to wait for BetaHub to answer. It writes the issue title with AI while the request is open,
+  # so do not go too low: a timeout after BetaHub saved the report makes the player think it failed.
+  request-timeout-seconds: 60
+
+# Name of this backend in your network (e.g. survival, lobby). The backend cannot learn its proxy name itself.
+server-name: ""
+
+report:
+  description-min-length: 10
+  description-max-length: 1000
+  steps-max-length: 1000
+  cooldown-seconds: 120
+  # Attach the last lines of logs/latest.log to each report. IP addresses are removed first.
+  attach-server-log: false
+  server-log-lines: 200
+
+# What to attach to each report. Player, server, world and versions are always attached.
+metadata:
+  coordinates: true
+  biome: true
+  # Needs ViaVersion on this backend (not only on the proxy). Also adds the client brand (vanilla, fabric, ...).
+  client-version: true
+  gamemode-health-ping: true
+
+# Copy metadata into BetaHub custom fields: <metadata key>: <custom field identifier>.
+# Keys: player_name, player_uuid, server_name, world, dimension, coordinates, location, tp_command, biome,
+#       minecraft_version, server_version, client_version, client_brand, game_mode, ping, reported_at, plugin_version
+# BetaHub creates unknown identifiers as hidden text fields. Example:
+#   custom-fields:
+#     server_name: server
+#     location: location
+custom-fields: {}
+
+commands:
+  # Also register /report as an alias of /bug. Off by default because many plugins use /report.
+  # Takes effect after a server restart.
+  report-alias: false
+
+# Everything players see. MiniMessage format: https://docs.advntr.dev/minimessage/format
+messages:
+  dialog-title: "Report a bug"
+  dialog-body: "Tell us what went wrong. Your position and game version are attached automatically."
+  dialog-description-label: "What happened?"
+  dialog-steps-label: "Steps to reproduce (optional)"
+  dialog-submit: "Submit"
+  dialog-cancel: "Cancel"
+  # <min> and <max> are the configured lengths.
+  description-too-short: "<red>Please describe the bug in at least <min> characters."
+  description-too-long: "<red>Please keep the description under <max> characters."
+  steps-too-long: "<red>Please keep the steps under <max> characters."
+  sending: "<gray>Sending report..."
+  # <url> is the issue page, <id> the issue number.
+  submitted: "<green>Thanks! Bug report submitted. <click:open_url:'<url>'><u>View it on BetaHub</u></click>"
+  cooldown: "<red>Please wait <seconds>s before sending another report."
+  failed: "<red>Sorry, the report could not be sent. Please try again later."
+  # BetaHub got the report but did not answer in time; it was probably saved.
+  uncertain: "<yellow>BetaHub did not confirm your report, but it may have arrived. Please don't send it again yet."
+  rejected: "<red>BetaHub could not accept this report. Please describe the problem in more detail."
+  rate-limited: "<red>Bug reporting is temporarily unavailable."
+  not-configured: "<red>Bug reporting is not set up on this server yet."
+  players-only: "Only players can report bugs."
